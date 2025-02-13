@@ -1,0 +1,105 @@
+Monthly_Revenue = 
+CALCULATE(
+    SUM(G360TempJAHClaimLFL[Total]),
+    DATESBETWEEN(CalendarJAHLFL[Date],MIN(CalendarJAHLFL[Date]), MAX(CalendarJAHLFL[Date]))
+)
+
+
+-------------------------------------------------------------------------------------------------------------------------
+
+
+Total_Members = DISTINCTCOUNT(G360TempJAHClaimLFL[MemberID])
+
+-------------------------------------------------------------------------------------------------------------------------
+
+
+New Joiners(Monthly) = 
+CALCULATE(
+    DISTINCTCOUNT(G360TempJAHClaimLFL[MemberID]),
+    DATESBETWEEN(CalendarJAHLFL[Date],MIN(CalendarJAHLFL[Date]),MAX(CalendarJAHLFL[Date]))
+)
+
+-----------------------------------------------------------------------------------------------------------------------
+
+Total_Revenue = SUM(G360TempJAHClaimLFL[Total])
+
+------------------------------------------------------------------------------------------------------------------------
+
+Avg_Revenue Per Member = DIVIDE(
+    [Total_Revenue],
+    [Total_Members]
+)
+
+-----------------------------------------------------------------------------------------------------------------------
+
+Total_Spend Per Member = 
+SUMX(
+    VALUES(G360TempJAHClaimLFL[MemberID]),
+    CALCULATE(SUM(G360TempJAHClaimLFL[AmountPaid]))
+)
+
+
+------------------------------------------------------------------------------------------------------------------------
+
+MoM_ Growth = 
+VAR CurrentMonthJoiners = [New Joiners(Monthly)]
+VAR PrevMonthJoiners = 
+    CALCULATE(
+        [New Joiners(Monthly)],
+        DATEADD(CalendarJAHLFL[Date], -1, MONTH)
+    )
+VAR FirstMonth = CALCULATE(MIN(CalendarJAHLFL[YearMonth]), ALL(CalendarJAHLFL))
+
+VAR CurrentYearMonth = SELECTEDVALUE(CalendarJAHLFL[YearMonth])
+
+RETURN
+IF(
+    NOT ISBLANK(CurrentYearMonth) && CurrentYearMonth > FirstMonth,  
+    IF(
+        ISBLANK(PrevMonthJoiners), 
+        BLANK(),  
+        DIVIDE(CurrentMonthJoiners - PrevMonthJoiners, PrevMonthJoiners)
+    ),
+    BLANK()  
+)
+
+-------------------------------------------------------------------------------------------------------------------------
+
+Projected Lost Revenue = 
+SUMX(
+    VALUES(G360TempJAHClaim24YTD[MemberID]),
+    VAR JoinDate = CALCULATE(MIN(G360TempJAHClaim24YTD[AddedDateOnly]))
+    VAR MonthsActive = DATEDIFF(JoinDate, DATE(2024,6,29),MONTH)
+    VAR LostMonths = 6 - MonthsActive
+    RETURN 
+    IF(LostMonths > 0,  LostMonths * 35)
+)
+    
+------------------------------------------------------------------------------------------------------------------------
+
+Retention Rate = 
+VAR CurrentMonth = MAX(CalendarJAH24[Date]) // Or SELECTEDVALUE(CalendarJAH24[YearMonth])
+VAR JoinMonth = 
+    CALCULATE(
+        MIN(CalendarJAH24[Date]),
+        ALL(CalendarJAH24)
+    )
+VAR MembersJoined = 
+    CALCULATE(
+        DISTINCTCOUNT(G360TempJAHClaim24YTD[MemberID]),
+        DATESBETWEEN(CalendarJAH24[Date], JoinMonth, EOMONTH(JoinMonth, 0))
+    )
+VAR ActiveMembers = 
+    CALCULATE(
+        DISTINCTCOUNT(G360TempJAHClaim24YTD[MemberID]),
+        G360TempJAHClaim24YTD[StatusID] = "Curr",
+        DATESBETWEEN(CalendarJAH24[Date], JoinMonth, EOMONTH(JoinMonth, 0))
+    )
+RETURN
+IF(
+    NOT ISBLANK(MembersJoined),
+    DIVIDE(ActiveMembers, MembersJoined),
+    BLANK()
+)
+
+------------------------------------------------------------------------------------------------------------------------
